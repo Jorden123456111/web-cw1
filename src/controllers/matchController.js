@@ -30,8 +30,8 @@ const createMatch = async (req, res, next) => {
 
 const getAllMatches = async (req, res, next) => {
   try {
-    const { page = 1, limit = 20, season, competition, status, teamId } = req.query;
-    const offset = (page - 1) * limit;
+    const { page, limit, offset } = req.pagination;
+    const { season, competition, status, teamId } = req.query;
     const where = {};
 
     if (season) where.season = season;
@@ -50,8 +50,8 @@ const getAllMatches = async (req, res, next) => {
         { model: Team, as: 'homeTeam', attributes: ['id', 'name', 'shortName'] },
         { model: Team, as: 'awayTeam', attributes: ['id', 'name', 'shortName'] },
       ],
-      limit: parseInt(limit),
-      offset: parseInt(offset),
+      limit,
+      offset,
       order: [['matchDate', 'DESC']],
     });
 
@@ -59,8 +59,8 @@ const getAllMatches = async (req, res, next) => {
       matches: rows,
       pagination: {
         total: count,
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page,
+        limit,
         totalPages: Math.ceil(count / limit),
       },
     });

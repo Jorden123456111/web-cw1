@@ -57,6 +57,12 @@ const Player = sequelize.define('Player', {
   },
 }, {
   timestamps: true,
+  indexes: [
+    { fields: ['teamId'] },
+    { fields: ['position'] },
+    { fields: ['nationality'] },
+    { fields: ['goals'] },
+  ],
 });
 
 module.exports = Player;

@@ -322,10 +322,167 @@ const getSeasonSummary = async (req, res, next) => {
   }
 };
 
+// Form trend: rolling results with cumulative points over time
+const getFormTrend = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { season, competition, last = 20 } = req.query;
+
+    const team = await Team.findByPk(id);
+    if (!team) {
+      return res.status(404).json({ error: 'Team not found.' });
+    }
+
+    const cappedLast = Math.min(parseInt(last) || 20, 50);
+
+    const where = {
+      [Op.or]: [{ homeTeamId: id }, { awayTeamId: id }],
+      status: 'completed',
+    };
+    if (season) where.season = season;
+    if (competition) where.competition = competition;
+
+    const matches = await Match.findAll({
+      where,
+      include: [
+        { model: Team, as: 'homeTeam', attributes: ['id', 'name', 'shortName'] },
+        { model: Team, as: 'awayTeam', attributes: ['id', 'name', 'shortName'] },
+      ],
+      order: [['matchDate', 'DESC']],
+      limit: cappedLast,
+    });
+
+    let cumulativePoints = 0;
+    const trend = matches.reverse().map((m) => {
+      const isHome = m.homeTeamId === parseInt(id);
+      const scored = isHome ? m.homeScore : m.awayScore;
+      const conceded = isHome ? m.awayScore : m.homeScore;
+      let result, pts;
+
+      if (scored > conceded) { result = 'W'; pts = 3; }
+      else if (scored === conceded) { result = 'D'; pts = 1; }
+      else { result = 'L'; pts = 0; }
+
+      cumulativePoints += pts;
+      const opponent = isHome ? m.awayTeam : m.homeTeam;
+
+      return {
+        matchId: m.id,
+        date: m.matchDate,
+        opponent: opponent ? opponent.name : 'Unknown',
+        venue: isHome ? 'Home' : 'Away',
+        scored,
+        conceded,
+        result,
+        points: pts,
+        cumulativePoints,
+      };
+    });
+
+    // Compute rolling averages
+    const totalPts = trend.reduce((s, t) => s + t.points, 0);
+    const totalScored = trend.reduce((s, t) => s + t.scored, 0);
+    const totalConceded = trend.reduce((s, t) => s + t.conceded, 0);
+    const n = trend.length;
+
+    res.json({
+      team: { id: team.id, name: team.name },
+      matchesAnalysed: n,
+      summary: {
+        pointsPerGame: n > 0 ? parseFloat((totalPts / n).toFixed(2)) : 0,
+        avgScored: n > 0 ? parseFloat((totalScored / n).toFixed(2)) : 0,
+        avgConceded: n > 0 ? parseFloat((totalConceded / n).toFixed(2)) : 0,
+        formString: trend.map((t) => t.result).join(''),
+      },
+      trend,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Home/away split: compare a team's home record vs away record
+const getHomeAwaySplit = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { season, competition } = req.query;
+
+    const team = await Team.findByPk(id);
+    if (!team) {
+      return res.status(404).json({ error: 'Team not found.' });
+    }
+
+    const baseWhere = { status: 'completed' };
+    if (season) baseWhere.season = season;
+    if (competition) baseWhere.competition = competition;
+
+    const homeMatches = await Match.findAll({
+      where: { ...baseWhere, homeTeamId: parseInt(id) },
+    });
+
+    const awayMatches = await Match.findAll({
+      where: { ...baseWhere, awayTeamId: parseInt(id) },
+    });
+
+    function computeSplit(matches, isHome) {
+      let wins = 0, draws = 0, losses = 0, goalsFor = 0, goalsAgainst = 0;
+      for (const m of matches) {
+        const scored = isHome ? m.homeScore : m.awayScore;
+        const conceded = isHome ? m.awayScore : m.homeScore;
+        goalsFor += scored;
+        goalsAgainst += conceded;
+        if (scored > conceded) wins++;
+        else if (scored === conceded) draws++;
+        else losses++;
+      }
+      const played = matches.length;
+      return {
+        played,
+        wins,
+        draws,
+        losses,
+        goalsFor,
+        goalsAgainst,
+        goalDifference: goalsFor - goalsAgainst,
+        points: wins * 3 + draws,
+        winRate: played > 0 ? parseFloat(((wins / played) * 100).toFixed(1)) : 0,
+        avgScored: played > 0 ? parseFloat((goalsFor / played).toFixed(2)) : 0,
+        avgConceded: played > 0 ? parseFloat((goalsAgainst / played).toFixed(2)) : 0,
+        cleanSheets: matches.filter((m) => {
+          return isHome ? m.awayScore === 0 : m.homeScore === 0;
+        }).length,
+      };
+    }
+
+    const homeSplit = computeSplit(homeMatches, true);
+    const awaySplit = computeSplit(awayMatches, false);
+    const totalPlayed = homeSplit.played + awaySplit.played;
+
+    res.json({
+      team: { id: team.id, name: team.name },
+      filters: { season: season || 'all', competition: competition || 'all' },
+      home: homeSplit,
+      away: awaySplit,
+      comparison: {
+        totalPlayed,
+        homeWinRate: homeSplit.winRate,
+        awayWinRate: awaySplit.winRate,
+        homeAdvantage: parseFloat((homeSplit.winRate - awaySplit.winRate).toFixed(1)),
+        homeGoalsAvg: homeSplit.avgScored,
+        awayGoalsAvg: awaySplit.avgScored,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   getLeaderboard,
   getTopScorers,
   getTeamPerformance,
   getHeadToHead,
   getSeasonSummary,
+  getFormTrend,
+  getHomeAwaySplit,
 };

@@ -393,6 +393,130 @@ describe('Analytics Endpoints', () => {
     expect(res.body).toHaveProperty('totalMatches');
     expect(res.body).toHaveProperty('goalsTrend');
   });
+
+  // --- Edge case tests ---
+
+  test('GET /api/analytics/leaderboard - should return empty standings for non-existent season', async () => {
+    const res = await request(app).get('/api/analytics/leaderboard?season=9999-0000&competition=Nonexistent');
+    expect(res.statusCode).toBe(200);
+    expect(res.body.standings).toEqual([]);
+    expect(res.body.totalMatches).toBe(0);
+  });
+
+  test('GET /api/analytics/head-to-head - should require both team IDs', async () => {
+    const res = await request(app).get(`/api/analytics/head-to-head?team1Id=${analyticsTeam1Id}`);
+    expect(res.statusCode).toBe(400);
+  });
+
+  test('GET /api/analytics/head-to-head - should 404 for non-existent team', async () => {
+    const res = await request(app).get('/api/analytics/head-to-head?team1Id=9999&team2Id=9998');
+    expect(res.statusCode).toBe(404);
+  });
+
+  test('GET /api/analytics/teams/:id/performance - should 404 for non-existent team', async () => {
+    const res = await request(app).get('/api/analytics/teams/9999/performance');
+    expect(res.statusCode).toBe(404);
+  });
+
+  test('GET /api/analytics/seasons/:season - should 404 for non-existent season', async () => {
+    const res = await request(app).get('/api/analytics/seasons/9999-0000');
+    expect(res.statusCode).toBe(404);
+  });
+
+  test('GET /api/analytics/top-scorers - should respect limit parameter', async () => {
+    const res = await request(app).get('/api/analytics/top-scorers?limit=1');
+    expect(res.statusCode).toBe(200);
+    expect(res.body.topScorers.length).toBeLessThanOrEqual(1);
+  });
+
+  test('GET /api/analytics/top-scorers - should filter by position', async () => {
+    const res = await request(app).get('/api/analytics/top-scorers?position=Forward');
+    expect(res.statusCode).toBe(200);
+    for (const scorer of res.body.topScorers) {
+      expect(scorer.position).toBe('Forward');
+    }
+  });
+
+  // --- New analytics endpoint tests ---
+
+  test('GET /api/analytics/teams/:id/form-trend - should return form trend', async () => {
+    const res = await request(app).get(`/api/analytics/teams/${analyticsTeam1Id}/form-trend`);
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toHaveProperty('team');
+    expect(res.body).toHaveProperty('matchesAnalysed');
+    expect(res.body).toHaveProperty('summary');
+    expect(res.body.summary).toHaveProperty('formString');
+    expect(res.body.summary).toHaveProperty('pointsPerGame');
+    expect(res.body).toHaveProperty('trend');
+    expect(Array.isArray(res.body.trend)).toBe(true);
+  });
+
+  test('GET /api/analytics/teams/:id/form-trend - should 404 for non-existent team', async () => {
+    const res = await request(app).get('/api/analytics/teams/9999/form-trend');
+    expect(res.statusCode).toBe(404);
+  });
+
+  test('GET /api/analytics/teams/:id/form-trend - should respect last parameter', async () => {
+    const res = await request(app).get(`/api/analytics/teams/${analyticsTeam1Id}/form-trend?last=1`);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.trend.length).toBeLessThanOrEqual(1);
+  });
+
+  test('GET /api/analytics/teams/:id/form-trend - should cap last at 50', async () => {
+    const res = await request(app).get(`/api/analytics/teams/${analyticsTeam1Id}/form-trend?last=999`);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.matchesAnalysed).toBeLessThanOrEqual(50);
+  });
+
+  test('GET /api/analytics/teams/:id/home-away - should return home/away split', async () => {
+    const res = await request(app).get(`/api/analytics/teams/${analyticsTeam1Id}/home-away`);
+    expect(res.statusCode).toBe(200);
+    expect(res.body).toHaveProperty('home');
+    expect(res.body).toHaveProperty('away');
+    expect(res.body).toHaveProperty('comparison');
+    expect(res.body.home).toHaveProperty('played');
+    expect(res.body.home).toHaveProperty('wins');
+    expect(res.body.home).toHaveProperty('winRate');
+    expect(res.body.home).toHaveProperty('cleanSheets');
+    expect(res.body.away).toHaveProperty('played');
+    expect(res.body.comparison).toHaveProperty('homeAdvantage');
+  });
+
+  test('GET /api/analytics/teams/:id/home-away - should 404 for non-existent team', async () => {
+    const res = await request(app).get('/api/analytics/teams/9999/home-away');
+    expect(res.statusCode).toBe(404);
+  });
+
+  test('GET /api/analytics/teams/:id/home-away - should filter by season', async () => {
+    const res = await request(app).get(`/api/analytics/teams/${analyticsTeam1Id}/home-away?season=2023-2024`);
+    expect(res.statusCode).toBe(200);
+    expect(res.body.filters.season).toBe('2023-2024');
+  });
+
+  test('GET /api/analytics/teams/:id/form-trend - should include cumulative points', async () => {
+    const res = await request(app).get(`/api/analytics/teams/${analyticsTeam1Id}/form-trend`);
+    expect(res.statusCode).toBe(200);
+    if (res.body.trend.length > 0) {
+      const lastEntry = res.body.trend[res.body.trend.length - 1];
+      expect(lastEntry).toHaveProperty('cumulativePoints');
+      expect(lastEntry).toHaveProperty('result');
+      expect(['W', 'D', 'L']).toContain(lastEntry.result);
+    }
+  });
+});
+
+describe('Pagination', () => {
+  test('GET /api/teams - should cap limit at 100', async () => {
+    const res = await request(app).get('/api/teams?limit=999');
+    expect(res.statusCode).toBe(200);
+    expect(res.body.pagination.limit).toBeLessThanOrEqual(100);
+  });
+
+  test('GET /api/teams - should default page to 1', async () => {
+    const res = await request(app).get('/api/teams?page=-1');
+    expect(res.statusCode).toBe(200);
+    expect(res.body.pagination.page).toBe(1);
+  });
 });
 
 describe('Root & 404', () => {

@@ -59,6 +59,16 @@ const Match = sequelize.define('Match', {
   },
 }, {
   timestamps: true,
+  indexes: [
+    { fields: ['homeTeamId'] },
+    { fields: ['awayTeamId'] },
+    { fields: ['season'] },
+    { fields: ['competition'] },
+    { fields: ['matchDate'] },
+    { fields: ['status'] },
+    { fields: ['season', 'competition', 'status'] },
+    { fields: ['homeTeamId', 'awayTeamId'] },
+  ],
 });
 
 module.exports = Match;

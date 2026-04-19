@@ -8,6 +8,8 @@ const {
   getTeamPerformance,
   getHeadToHead,
   getSeasonSummary,
+  getFormTrend,
+  getHomeAwaySplit,
 } = require('../controllers/analyticsController');
 
 /**
@@ -158,5 +160,86 @@ router.get('/head-to-head', getHeadToHead);
  *         description: No matches found for the given season
  */
 router.get('/seasons/:season', getSeasonSummary);
+
+/**
+ * @swagger
+ * /api/analytics/teams/{id}/form-trend:
+ *   get:
+ *     summary: Get rolling form trend for a team
+ *     description: >
+ *       Returns match-by-match results in chronological order with cumulative points.
+ *       Useful for visualising momentum and identifying winning/losing streaks.
+ *       The "last" parameter caps at 50 to prevent oversized responses.
+ *     tags: [Analytics]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Team ID
+ *       - in: query
+ *         name: season
+ *         schema:
+ *           type: string
+ *         description: Filter by season (e.g. "2023-2024")
+ *       - in: query
+ *         name: competition
+ *         schema:
+ *           type: string
+ *         description: Filter by competition
+ *       - in: query
+ *         name: last
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *           maximum: 50
+ *         description: Number of recent matches to analyse (max 50)
+ *     responses:
+ *       200:
+ *         description: Rolling form with per-match results and cumulative points curve
+ *       404:
+ *         description: Team not found
+ */
+router.get('/teams/:id/form-trend', validate([
+  param('id').isInt().withMessage('Team ID must be an integer.'),
+]), getFormTrend);
+
+/**
+ * @swagger
+ * /api/analytics/teams/{id}/home-away:
+ *   get:
+ *     summary: Get home vs away performance split for a team
+ *     description: >
+ *       Compares a team's record when playing at home versus away.
+ *       Returns wins, draws, losses, goals, clean sheets, and win rates for each venue type,
+ *       plus a "homeAdvantage" metric showing the percentage-point difference in win rate.
+ *     tags: [Analytics]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Team ID
+ *       - in: query
+ *         name: season
+ *         schema:
+ *           type: string
+ *         description: Filter by season
+ *       - in: query
+ *         name: competition
+ *         schema:
+ *           type: string
+ *         description: Filter by competition
+ *     responses:
+ *       200:
+ *         description: Home and away statistics with comparison metrics
+ *       404:
+ *         description: Team not found
+ */
+router.get('/teams/:id/home-away', validate([
+  param('id').isInt().withMessage('Team ID must be an integer.'),
+]), getHomeAwaySplit);
 
 module.exports = router;

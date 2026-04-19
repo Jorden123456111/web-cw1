@@ -19,8 +19,8 @@ const createPlayer = async (req, res, next) => {
 
 const getAllPlayers = async (req, res, next) => {
   try {
-    const { page = 1, limit = 20, position, nationality, teamId, search } = req.query;
-    const offset = (page - 1) * limit;
+    const { page, limit, offset } = req.pagination;
+    const { position, nationality, teamId, search } = req.query;
     const where = {};
 
     if (position) where.position = position;
@@ -31,8 +31,8 @@ const getAllPlayers = async (req, res, next) => {
     const { count, rows } = await Player.findAndCountAll({
       where,
       include: [{ model: Team, as: 'team', attributes: ['id', 'name', 'shortName'] }],
-      limit: parseInt(limit),
-      offset: parseInt(offset),
+      limit,
+      offset,
       order: [['name', 'ASC']],
     });
 
@@ -40,8 +40,8 @@ const getAllPlayers = async (req, res, next) => {
       players: rows,
       pagination: {
         total: count,
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page,
+        limit,
         totalPages: Math.ceil(count / limit),
       },
     });

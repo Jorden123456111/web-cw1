@@ -12,8 +12,8 @@ const createTeam = async (req, res, next) => {
 
 const getAllTeams = async (req, res, next) => {
   try {
-    const { page = 1, limit = 20, country, league, search } = req.query;
-    const offset = (page - 1) * limit;
+    const { page, limit, offset } = req.pagination;
+    const { country, league, search } = req.query;
     const where = {};
 
     if (country) where.country = country;
@@ -22,8 +22,8 @@ const getAllTeams = async (req, res, next) => {
 
     const { count, rows } = await Team.findAndCountAll({
       where,
-      limit: parseInt(limit),
-      offset: parseInt(offset),
+      limit,
+      offset,
       order: [['name', 'ASC']],
     });
 
@@ -31,8 +31,8 @@ const getAllTeams = async (req, res, next) => {
       teams: rows,
       pagination: {
         total: count,
-        page: parseInt(page),
-        limit: parseInt(limit),
+        page,
+        limit,
         totalPages: Math.ceil(count / limit),
       },
     });
