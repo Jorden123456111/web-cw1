@@ -1,10 +1,10 @@
-# Football Statistics API Documentation (v1.2)
+# Football Statistics API Documentation (v1.3)
 
 ## Base Information
 
 - Base URL: `http://localhost:3000`
 - Swagger UI: `http://localhost:3000/api-docs`
-- API Version: `1.2.0`
+- API Version: `1.3.0`
 
 ## Authentication and Authorization
 
@@ -245,7 +245,13 @@ npm test
 npm run test:coverage
 ```
 
-Current v1.2 test profile:
+Current v1.3 test profile:
 
 - 56 integration tests
-- ~82.5% statement coverage
+- 82.68% statement coverage
+
+PDF export command:
+
+```bash
+npm run docs:pdf
+```

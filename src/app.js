@@ -47,7 +47,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.get('/', (req, res) => {
   res.json({
     name: 'Football Statistics API',
-    version: '1.2.0',
+    version: '1.3.0',
     description: 'A RESTful API for football match statistics, team management, player tracking, and performance analytics.',
     documentation: '/api-docs',
     endpoints: {

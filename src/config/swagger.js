@@ -5,7 +5,7 @@ const options = {
     openapi: '3.0.0',
     info: {
       title: 'Football Statistics API',
-      version: '1.1.0',
+      version: '1.3.0',
       description:
         'A comprehensive RESTful API for football (soccer) match statistics, team management, player tracking, and performance analytics. Built with Node.js, Express, Sequelize, and SQLite.',
       contact: {

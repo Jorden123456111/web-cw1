@@ -4,9 +4,10 @@ A REST API for football match statistics, team/player management, and analytics.
 
 ## Version
 
-Current release: `v1.2.0`
+Current release: `v1.3.0`
+Release type: `Final submission candidate`
 
-## v1.2 Highlights
+## v1.3 Highlights
 
 - Real dataset import pipeline from Kaggle CSV (`data/results.csv`)
 - Two new analytics endpoints:
@@ -15,7 +16,18 @@ Current release: `v1.2.0`
 - Pagination hard cap (`limit <= 100`) via shared middleware
 - Database indexes for frequent filters/sorts on `Match` and `Player`
 - Security middleware enabled: `helmet` + request rate limiting
-- Expanded automated tests: 56 integration tests, ~82.5% statement coverage
+- Expanded automated tests: 56 integration tests, 82.68% statement coverage
+- CI workflow for automated verification on push/PR (`.github/workflows/ci.yml`)
+
+## Submission Artifacts
+
+- Technical report: `docs/Technical_Report.md`
+- API documentation (Markdown): `docs/API_Documentation.md`
+- API documentation (PDF): `docs/API_Documentation.pdf` (generated via `npm run docs:pdf`)
+- Assessment mapping: `docs/Assessment_Mapping.md`
+- Deployment guide: `docs/Deployment_Guide.md`
+- Presentation pack: `docs/Presentation_Plan.md`
+- GenAI declaration: `docs/GenAI_Declaration.md`
 
 ## Tech Stack
 
@@ -140,7 +152,15 @@ npm run test:coverage
 Latest local results on this branch:
 
 - Tests: `56 passed`
-- Coverage: `82.5% statements`
+- Coverage: `82.68% statements`
+
+## Documentation PDF Generation
+
+```bash
+npm run docs:pdf
+```
+
+This command exports `docs/API_Documentation.md` to `docs/API_Documentation.pdf` for submission.
 
 ## Notes
 
