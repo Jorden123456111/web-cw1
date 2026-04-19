@@ -1,113 +1,177 @@
-# Technical Report: Football Statistics API
+# Technical Report: Football Statistics API (v1.2)
 
-**Module:** XJCO3011 — Web Services and Web Data
-**Assessment:** Coursework 1 — Individual Web Services API Development Project
-**Date:** April 2026
+## 1. Project Overview
 
----
+This project is a REST API for football statistics and analytics. It includes complete CRUD for teams, players, and matches, plus domain analytics such as leaderboard, top scorers, team form, and season-level trends.
 
-## 1. Introduction and Project Overview
+The project objective was to combine:
 
-This project delivers a RESTful API for football match statistics, covering team and player management, match record-keeping, and analytical endpoints such as league standings, top scorers, head-to-head comparisons, and season trend analysis. The API is backed by a relational database and secured with token-based authentication.
+- clean CRUD design
+- relational data modelling
+- analytical endpoints over real-world style data
+- authentication, authorization, validation, testing, and documentation
 
-The domain was chosen for two reasons. First, football data is inherently relational — teams contain players, matches reference two teams, and analytical queries cut across all three entities — which makes it a natural fit for demonstrating SQL joins, aggregation, and layered data modelling. Second, the availability of well-structured public datasets (e.g. Kaggle's European football datasets) means the project can be seeded with realistic data without fabricating domain knowledge.
+The current release is `v1.2.0`.
 
----
+## 2. Technology Choices
 
-## 2. Technology Stack and Justification
+| Layer | Choice | Reason |
+| --- | --- | --- |
+| Runtime | Node.js | Fast iteration and strong ecosystem for API development |
+| Framework | Express | Flexible middleware pipeline and clear routing |
+| ORM | Sequelize | Model associations, constraints, and cross-table queries |
+| Database | SQLite | Portable local setup for assessment and demos |
+| Auth | JWT + bcryptjs | Stateless API auth with hashed passwords |
+| Validation | express-validator | Centralized request validation with readable rules |
+| Documentation | Swagger (swagger-jsdoc + swagger-ui-express) | Interactive and examiner-friendly endpoint docs |
+| Testing | Jest + Supertest | Full integration tests against API endpoints |
 
-| Layer | Choice | Rationale |
-|-------|--------|-----------|
-| Runtime | Node.js | Event-driven, non-blocking I/O suits an API workload dominated by database queries rather than CPU-bound computation. The JavaScript ecosystem also means a single language across the full stack. |
-| Framework | Express.js | Minimal and unopinionated. Unlike Django or NestJS, Express imposes almost no structural decisions, which allowed me to design the project layout (controllers, routes, middleware, models) from scratch — a deliberate choice to demonstrate architectural understanding. |
-| ORM | Sequelize | Provides model definitions, migrations, associations, and query building without raw SQL. The association API (`hasMany`, `belongsTo`) maps cleanly onto the Team → Player and Team → Match relationships. |
-| Database | SQLite | Zero-configuration, file-based, and fully portable. The examiner can clone the repository, run `npm run seed`, and have a populated database without installing PostgreSQL or MySQL. For a project of this scale (hundreds, not millions, of rows), SQLite introduces no meaningful performance limitation. |
-| Authentication | JWT (jsonwebtoken + bcryptjs) | Stateless tokens avoid server-side session storage. Passwords are hashed with bcrypt before storage; tokens carry user ID and role, enabling role-based access control without additional database lookups on every request. |
-| Validation | express-validator | Declarative validation chains keep route definitions readable and separate validation logic from business logic in controllers. |
-| Documentation | swagger-jsdoc + swagger-ui-express | JSDoc-style annotations co-located with route definitions mean the documentation stays in sync with the code. Swagger UI provides an interactive testing interface at `/api-docs`. |
-| Testing | Jest + Supertest | Jest handles test orchestration and assertions; Supertest sends real HTTP requests to the Express app without starting a live server, which keeps tests fast and deterministic. |
+## 3. Architecture
 
-I considered Django REST Framework and FastAPI as alternatives. Django would have provided an admin panel and built-in ORM, but the overhead of Django's project structure felt excessive for an API-only project with no HTML rendering. FastAPI (Python) offers automatic OpenAPI generation and async support, but I was more confident delivering a polished result in JavaScript within the available timeframe, and Express's middleware model gave me finer control over request processing.
+The codebase uses a layered structure:
 
----
+- `routes/`: HTTP contract and validation wiring
+- `controllers/`: business logic and response shaping
+- `models/`: Sequelize schema and associations
+- `middleware/`: auth, validation, pagination, and global error handling
+- `scripts/`: seed/import workflows
 
-## 3. Architecture and Design Decisions
+This separation keeps CRUD responsibilities distinct from analytics computation logic and improves maintainability for iteration.
 
-The application follows a layered MVC-style architecture:
+## 4. Data Model
 
-**Routes** define URL patterns and attach validation middleware, then delegate to **controllers**. Controllers contain business logic and interact with **models** (Sequelize definitions). A global **error-handling middleware** catches exceptions from any layer and returns consistent JSON error responses with appropriate HTTP status codes.
+Core entities:
 
-Key design decisions:
+- `User`: authentication identity and role (`user` or `admin`)
+- `Team`: team identity and metadata
+- `Player`: player profile and aggregate performance fields
+- `Match`: fixture/result record linking home and away teams
 
-**Separation of CRUD and analytics.** CRUD endpoints for teams, players, and matches live in their own route files and controllers. Analytical endpoints (leaderboard, top scorers, team performance, head-to-head, season summary) are grouped under `/api/analytics` with a dedicated controller. This separation keeps the codebase navigable and allows the analytics layer to evolve independently — for instance, adding caching or materialised views later without touching CRUD logic.
+Important relationships:
 
-**Authentication on write operations only.** Read endpoints (GET) are public; create, update, and delete operations require a valid JWT. This mirrors real-world sports data APIs (e.g. football-data.org), where statistics are publicly queryable but data modification is restricted.
+- Team 1..* Player
+- Team 1..* Match (home)
+- Team 1..* Match (away)
 
-**Pagination by default.** All list endpoints return paginated responses with `page`, `limit`, `total`, and `totalPages` metadata. This prevents unbounded result sets and establishes a consistent response contract across endpoints.
+`Match` and `Player` models include added indexes in v1.2 to improve common filtering and analytics query paths.
 
-**Computed analytics at query time.** The leaderboard, for example, is calculated by iterating over completed matches and accumulating points, goal difference, and win/draw/loss counts. For the current data volume this is fast enough. In a production system with millions of matches, I would pre-compute standings into a dedicated table and update them via database triggers or background jobs.
+## 5. Public Dataset Integration (v1.2)
 
----
+v1.2 introduced a real dataset import pipeline:
 
-## 4. Database Schema
+- Source: Kaggle international football results (`results.csv`)
+- Location in project: `data/results.csv` (CSV ignored by git)
+- Command: `npm run import`
 
-Four models are defined:
+Import workflow:
 
-- **User** — `id`, `username`, `email`, `password` (bcrypt-hashed), `role` (user/admin).
-- **Team** — `id`, `name`, `shortName`, `country`, `league`, `founded`, `stadium`, `logoUrl`.
-- **Player** — `id`, `name`, `nationality`, `position`, `dateOfBirth`, `shirtNumber`, `goals`, `assists`, `appearances`, `yellowCards`, `redCards`, `teamId` (foreign key → Team).
-- **Match** — `id`, `homeTeamId`, `awayTeamId` (both foreign keys → Team), `homeScore`, `awayScore`, `matchDate`, `season`, `competition`, `venue`, `referee`, `status`.
+1. Parse CSV records.
+2. Filter matches to 2018+ to keep size manageable.
+3. Remove rows with invalid scores.
+4. Normalize team names and create team records.
+5. Auto-derive season values from date.
+6. Insert matches in batches.
+7. Create representative player records for major national teams.
 
-The Team–Player relationship is one-to-many. The Team–Match relationship is expressed through two foreign keys (`homeTeamId`, `awayTeamId`), each with its own Sequelize association alias (`homeTeam`, `awayTeam`). This dual-key pattern is standard for match/fixture modelling and enables queries like "find all matches involving Team X" using an `OR` condition.
+License note: the source and license are cited in import script comments. The report should also cite the Kaggle dataset URL in final submission materials.
 
----
+## 6. API Features and Iterative Progress
 
-## 5. Testing Approach
+### v1.0 Baseline
 
-The test suite contains 29 integration tests organised into five groups: authentication, teams, players, matches, analytics, and general (root endpoint, 404 handling). Tests run against an in-memory SQLite database (created via `sequelize.sync({ force: true })` in `beforeAll`), so each test run starts from a clean state.
+- Core CRUD for Teams/Players/Matches
+- Authentication endpoints
+- Basic analytics endpoints
+- Initial docs and test coverage
 
-The tests cover the main success and failure paths: creating resources with and without authentication, handling duplicate entries, querying non-existent IDs, validating that analytics endpoints require mandatory parameters, and verifying correct HTTP status codes throughout. Edge cases such as attempting to create a match where the home and away teams are identical are also tested.
+### v1.1 Hardening
 
-Running `npm test` executes the full suite in approximately 2.5 seconds.
+- RBAC enforcement for destructive operations
+- Better validation and error handling
+- Improved project structure and consistency
 
----
+### v1.2 Analytics + Data Upgrade
 
-## 6. Challenges and Lessons Learned
+- Real dataset import from CSV
+- New endpoint: `GET /api/analytics/teams/:id/form-trend`
+- New endpoint: `GET /api/analytics/teams/:id/home-away`
+- Shared pagination sanitization with hard cap (`limit <= 100`)
+- Security middleware enabled globally (`helmet`, rate limiting)
+- Additional indexes for query speed
+- Expanded integration tests (56 total)
 
-The most instructive challenge was handling Express 5's differences from Express 4. Express 5 was installed by default via npm, and its routing behaviour differs subtly — for instance, parameter validation and error propagation behave differently. Debugging a few silent failures in middleware chaining taught me to read changelogs carefully before adopting a major version upgrade.
+This versioning strategy demonstrates clear iteration rather than one-time delivery.
 
-Designing the analytics controller required thinking about data aggregation without relying on complex SQL. I chose to fetch relevant matches into memory and compute standings in JavaScript rather than writing raw SQL `GROUP BY` queries. This is less efficient at scale but far more readable and testable, and it keeps the codebase free of raw SQL strings that would undermine the purpose of using an ORM.
+## 7. Security and Validation
 
-Seeding realistic data was another consideration. Random score generation needed to produce plausible football scorelines (mostly 0–3 goals per team, with a home-team advantage bias), not uniformly distributed random numbers. Tuning the probability distribution took a few iterations.
+Implemented controls:
 
----
+- Password hashing with bcrypt
+- JWT-based authentication
+- Role checks for admin-only delete routes
+- Request body and parameter validation (`express-validator`)
+- Global security headers via `helmet`
+- API-level rate limiting (`200` requests / `15` minutes / IP)
 
-## 7. Limitations and Future Improvements
+Error responses are normalized through centralized middleware.
 
-The current implementation has several known limitations that would need addressing for production use:
+## 8. Testing Strategy and Results
 
-- **No rate limiting.** The API does not throttle requests, making it vulnerable to abuse. Adding `express-rate-limit` would be straightforward.
-- **No refresh tokens.** JWT expiry requires a full re-login. A refresh token mechanism would improve the user experience.
-- **Aggregated stats on Player model.** Goals, assists, and appearances are stored directly on the Player record rather than derived from match events. A more normalised design would record individual match performances in a separate table and compute totals via queries.
-- **SQLite concurrency.** SQLite supports only one writer at a time. Under concurrent write load, PostgreSQL or MySQL would be necessary.
-- **No deployment.** The API runs locally. Deploying to a platform like Railway or Render, with PostgreSQL as the database, would be the natural next step.
+Testing uses Jest + Supertest integration tests and covers:
 
----
+- authentication flows
+- CRUD success/failure cases
+- authorization boundaries
+- validation failures
+- analytics endpoint behavior and required params
 
-## 8. Generative AI Declaration
+Latest local v1.2 results:
 
-Generative AI tools were used throughout this project in the following capacities:
+- test suite: **56 passed**
+- statement coverage: **about 82.5%**
 
-| Tool | Purpose |
-|------|---------|
-| Windsurf Cascade (Claude) | Code generation, architectural planning, debugging, writing seed data scripts, generating Swagger documentation annotations, writing tests, and drafting this report. |
+A known practical note is to run test commands sequentially (not in parallel) when sharing one SQLite test DB file.
 
-AI was used as a pair-programming partner rather than a black-box code generator. I described the desired architecture, endpoint structure, and data model; the AI produced initial implementations which I reviewed, tested, and refined. Key decisions — the choice of Express over Django, the separation of analytics from CRUD, the decision to compute standings in-memory — were made by me and then implemented with AI assistance.
+## 9. Documentation and Presentation Readiness
 
-The most valuable use of AI was in accelerating boilerplate: Swagger JSDoc annotations, express-validator chains, and Sequelize model definitions are repetitive and error-prone to write manually. AI generated these reliably, freeing time to focus on the analytics logic and testing strategy.
+Submission-facing materials now include:
 
-Conversation logs from the Windsurf Cascade sessions are attached as supplementary material.
+- `README.md` quick-start + feature summary
+- `docs/API_Documentation.md` endpoint-level contract summary
+- `docs/Technical_Report.md` architecture, dataset, security, testing, and iteration narrative
+- Swagger UI for live API exploration
 
----
+For oral presentation, useful evidence sections are:
 
-*Word count: approximately 1,200 words across 5 pages.*
+- commit history across `v1.0`, `v1.1`, `v1.2`
+- screenshots of Swagger docs and key endpoint responses
+- test run output and coverage report
+- dataset import command and resulting DB records
+
+## 10. Limitations and Next Iteration (v1.3 candidate)
+
+Current limitations:
+
+- SQLite is not ideal for high-concurrency production use.
+- No refresh token flow yet.
+- Player aggregate stats are stored fields, not event-derived.
+
+Planned v1.3 improvements:
+
+1. Deploy to external hosting (for stronger marking bands).
+2. Add CI pipeline for automated tests on push.
+3. Add caching for heavy analytics routes.
+4. Add audit trail/logging for write operations.
+5. Add stronger negative-path and load tests.
+
+## 11. Generative AI Usage Declaration
+
+Generative AI was used as a productivity assistant for:
+
+- refining architecture options
+- drafting import logic and validation boilerplate
+- improving documentation and report structure
+- identifying regression risks during iteration
+
+All generated output was reviewed, tested, and edited before inclusion.
+

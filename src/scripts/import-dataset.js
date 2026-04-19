@@ -1,30 +1,31 @@
 /**
  * Real Dataset Import Script
- * 
+ *
  * Data source: "International Football Results from 1872 to 2024"
- * Author: Mart Jürisoo
+ * Author: Mart Juurisoo
  * URL: https://www.kaggle.com/datasets/martj42/international-football-results-from-1872-to-2017
  * License: CC BY-SA 4.0 (https://creativecommons.org/licenses/by-sa/4.0/)
- * 
- * Field mapping (CSV → Database):
- *   date        → Match.matchDate
- *   home_team   → Team.name (auto-created if not exists)
- *   away_team   → Team.name (auto-created if not exists)
- *   home_score  → Match.homeScore
- *   away_score  → Match.awayScore
- *   tournament  → Match.competition
- *   city        → Match.venue (city name used as venue)
- *   country     → Team.country (derived from match host)
- *   neutral     → (used to determine venue accuracy)
+ *
+ * Field mapping (CSV -> Database):
+ *   date        -> Match.matchDate
+ *   home_team   -> Team.name (auto-created if not exists)
+ *   away_team   -> Team.name (auto-created if not exists)
+ *   home_score  -> Match.homeScore
+ *   away_score  -> Match.awayScore
+ *   tournament  -> Match.competition
+ *   city        -> Match.venue (city name used as venue)
+ *   country     -> Team.country (derived from match host)
+ *   neutral     -> (used to determine venue accuracy)
  *
  * Cleaning steps:
  *   1. Filter to matches from 2018 onwards (keep dataset manageable)
  *   2. Discard rows where home_score or away_score is null/NaN
  *   3. Trim whitespace from all string fields
  *   4. Deduplicate team names and normalise casing
- *   5. Auto-assign season based on match date (Aug–Jul cycle)
+ *   5. Auto-assign season based on match date (Aug-Jul cycle)
  *   6. Generate synthetic player data for top national teams
  */
+
 
 require('dotenv').config();
 const fs = require('fs');
@@ -170,7 +171,7 @@ async function importDataset() {
         teamMap.set(homeName, { name: homeName, country: country, league: r.tournament.trim() });
       }
       if (!teamMap.has(awayName)) {
-        teamMap.set(awayName, { name: awayName, country: awayName, league: r.tournament.trim() });
+        teamMap.set(awayName, { name: awayName, country: country, league: r.tournament.trim() });
       }
     }
 
@@ -189,7 +190,7 @@ async function importDataset() {
     }
     console.log(`${createdTeams.length} teams created.`);
 
-    // Build name→id lookup
+    // Build name -> id lookup
     const teamLookup = {};
     for (const t of createdTeams) {
       teamLookup[t.name] = t.id;
@@ -254,3 +255,4 @@ async function importDataset() {
 }
 
 importDataset();
+
